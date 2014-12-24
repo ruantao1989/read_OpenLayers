@@ -12,12 +12,37 @@
 4.根据url的传参定位地图(可以逆向生成url)
 	//true时候url会跟着地图的变化而动态生成, false只会在点击固定连接时才生成一次
 	map.addControl(new OpenLayers.Control.Permalink({anchor: true}));
-5.设置缩放级别
+5.限制缩放级别
 	var options = {
 		scales: [50000000, 30000000, 10000000, 5000000] 
 		resolutions: [1.40625,0.703125,0.3515625,0.17578125,0.087890625,0.0439453125]
 	};
 	map = new OpenLayers.Map('map' , options);
+	//或
+	map = new OpenLayers.Map({
+        div: "map",
+        projection: "EPSG:900913",
+        controls: [],
+        fractionalZoom: true//限制级别,这个需要在Layer中设置zoom级别
+    });
+6.鼠标拾取事件
+	var size = map.getSize();
+	map.events.on({
+	    mousemove: function(event) {...}
+7.比例尺
+	new OpenLayers.Control.ScaleLine()
+	//中文
+	OpenLayers.INCHES_PER_UNIT["公里"] = OpenLayers.INCHES_PER_UNIT["km"]
+	OpenLayers.INCHES_PER_UNIT["米"] = OpenLayers.INCHES_PER_UNIT["m"]
+	new OpenLayers.Control.ScaleLine({
+		topOutUnits:"公里",
+		bottomOutUnits:"米"
+	});
+8.骨头棒zoom范围
+	map = new OpenLayers.Map('map', {
+        controls: [],
+        numZoomLevels: 6//六级
+    });
 
 
 
@@ -69,6 +94,66 @@
 	//bing地图的级别, 一般都是在new Map时候传入参数
     maxResolution: 76.43702827453613,
     numZoomLevels: 3
+9.Layer.Boxes绘制矩形线框
+	//绘图图层
+	var boxes  = new OpenLayers.Layer.Boxes( "Boxes" );
+	//边界
+	var box_extents = [
+		[-10, 50, 5, 60],
+		[-75, 41, -71, 44],
+		[-122.6, 37.6, -122.3, 37.9],
+		[10, 10, 20, 20]
+	];
+	//根据边界画矩形
+	for (var i = 0; i < box_extents.length; i++) {
+	    ext = box_extents[i];
+	    bounds = OpenLayers.Bounds.fromArray(ext);
+	    box = new OpenLayers.Marker.Box(bounds);
+	    box.events.register("click", box, function (e) {
+	        this.setBorder("yellow");
+	    });
+	    boxes.addMarker(box);
+	}
+	map.addLayers([ol_wms, boxes]);
+10.Layer.Vector绘制矩形要素
+	var boxes  = new OpenLayers.Layer.Vector( "Boxes" );
+	for (var i = 0; i < box_extents.length; i++) {
+	    ext = box_extents[i];
+	    bounds = OpenLayers.Bounds.fromArray(ext);
+	    box = new OpenLayers.Feature.Vector(bounds.toGeometry());
+	    boxes.addFeatures(box);
+	}
+	map.addLayers([ol_wms, boxes]);
+	//选择Vector工具
+	var sf = new OpenLayers.Control.SelectFeature(boxes);
+	map.addControl(sf);
+	sf.activate();//激活选择器, 可点选激活
+11.缓存瓦片数
+	//设置缓存的瓦片数(包括视野外的)默认是0
+	new OpenLayers.Layer.WMS( ..., {'buffer':4})
+12.利用localStorage做缓存
+	//1.写
+	cacheWrite = new OpenLayers.Control.CacheWrite({
+	    autoActivate: true,
+	    imageFormat: "image/jpeg",
+	    eventListeners: {
+	        cachefull: function() { status.innerHTML = "Cache full."; }
+	    }
+	});
+	map.addControl(cacheWrite);
+	//写事件
+	map.layers[0].events.on({'tileloaded': updateStatus});
+	//2.读
+	cacheRead = new OpenLayers.Control.CacheRead();
+	map.addControl(cacheRead);
+	//读事件
+	new OpenLayers.Layer.WMS({...
+	    eventListeners: {
+	        tileloaded: updateHits
+	    }
+	})
+13.canvas绘图元素
+	
 
 
 
@@ -138,6 +223,91 @@
 	map.addControl(new OpenLayers.Control.Attribution())
 10.骨头棒
 	new OpenLayers.Control.PanZoomBar()	
+11.自定义点击显示经纬度控件
+	//自定义控件
+	OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {                
+        defaultHandlerOptions: {
+            'single': true,
+            'double': false,
+            'pixelTolerance': 0,
+            'stopSingle': false,
+            'stopDouble': false
+        },
+        //初始化接口
+        initialize: function(options) {
+        	//扩展Options
+            this.handlerOptions = OpenLayers.Util.extend(
+                {}, this.defaultHandlerOptions
+            );
+            OpenLayers.Control.prototype.initialize.apply(
+                this, arguments
+            ); 
+            //initialize中要指定this.handler , 对于单击当然是OpenLayers.Handler.Click
+            this.handler = new OpenLayers.Handler.Click(
+                this, {
+                    'click': this.trigger//本control的trigger接口,
+                }, this.handlerOptions//参数,策略 在最开始
+            );
+        }, 
+        //触发接口
+        trigger: function(e) {
+            var lonlat = map.getLonLatFromPixel(e.xy);
+            alert("You clicked near " + lonlat.lat + " N, " +
+                                      + lonlat.lon + " E");
+        }
+    });
+	//添加进map 还得激活一下
+	var click = new OpenLayers.Control.Click();
+    map.addControl(click);
+    click.activate();
+12.双击拖动等自定义Control
+	//自定义控件中
+	this.handler = new OpenLayers.Handler.Click(
+        this, {
+            'click': this.onClick,
+            'dblclick': this.onDblclick //this.handler和接口可以一对多
+        }, this.handlerOptions
+    );
+    ...
+    onDblclick: function(evt) {  
+        var msg = "dblclick " + evt.xy;
+    }  
+    //单独定义control
+    "drag": new OpenLayers.Control.Click({
+        handlerOptions: {
+            "single": true,
+            "pixelTolerance": null
+        }
+    })
+13.shift画框之前alert
+	var control = new OpenLayers.Control();
+	//这次用的Util.extend扩展control
+    OpenLayers.Util.extend(control, {
+        draw: function () {
+            this.box = new OpenLayers.Handler.Box( control,
+                {"done": this.notice},
+                {keyMask: OpenLayers.Handler.MOD_SHIFT});
+            this.box.activate();
+        },
+        notice: function (bounds) {
+            var ll = map.getLonLatFromPixel(new OpenLayers.Pixel(bounds.left, bounds.bottom)); 
+            var ur = map.getLonLatFromPixel(new OpenLayers.Pixel(bounds.right, bounds.top)); 
+            alert(ll.lon.toFixed(4) + ", " + 
+                  ll.lat.toFixed(4) + ", " + 
+                  ur.lon.toFixed(4) + ", " + 
+                  ur.lat.toFixed(4));
+        }
+    });
+14.自定义MousePosition的Css样式
+	p {
+        width: 500px;
+    }
+    div.olControlMousePosition {
+        font-family: Verdana;
+        font-size: 2em;
+        color: red;
+    }
+	map.addControl(new OpenLayers.Control.MousePosition());
 
 
 
@@ -170,30 +340,151 @@
 	point.geometry.clearBounds();
 	vectorLayer.addFeatures([point], {silent: true});//addFeatures()仅仅是Layer.Vector的方法,也就说要画在Layer.Vector上
 	vectorLayer.drawFeature(point, this.style);//Layer.Vector图层上绘制
+2.
 
 
 
-六:Protocol协议
+六:Geometry几何
+1.在Layer.Vector上绘制几何图形
+	var Geometry = OpenLayers.Geometry;
+	var features = [
+	    new Feature(
+	        new Geometry.Point(0, 45),
+	        {cls: "one"}
+	    ),
+	    new Feature(
+	        Geometry.fromWKT("POLYGON((20 -20, 110 -20, 110 -80, 20 -80, 20 -20), (40 -40, 90 -40, 90 -60, 40 -60, 40 -40))")
+	    )    
+	];
+	//绘制几何图形
+	var layer = new OpenLayers.Layer.Vector(... {
+	    renderers: ["Canvas"]
+	});
+	layer.addFeatures(features);
+	//点选
+	var select = new OpenLayers.Control.SelectFeature(layer);
+	map.addControl(select);
+	select.activate();
+
+
+
+七:Style样式
+1.规则和样式的匹配
+	var Rule = OpenLayers.Rule;
+	var Filter = OpenLayers.Filter;
+	var style = new OpenLayers.Style({
+	    pointRadius: 10,
+	    strokeWidth: 3,
+	    strokeOpacity: 0.7,
+	    strokeColor: "navy",
+	    fillColor: "#ffcc66",
+	    fillOpacity: 1
+	}, {
+	rules: [
+	    new Rule({
+	        filter: new Filter.Comparison({
+	            type: "==",
+	            property: "cls",
+	            value: "one"//对应new Feature(new Geometry.Point(0, 45),{cls: "one"}
+	        }),
+	        symbolizer: {
+	            externalGraphic: "../img/marker-blue.png"
+	        }
+	    }),
+
+
+
+八:Protocol协议
 1.jsonp图层
 	var jsonp = new OpenLayers.Protocol.Script();
 	jsonp.createRequest(layerURL, {
 	    f: 'json', 
 	    pretty: 'true'
 	}, initMap);//initMap是回调函数
-       
+2.Script图层(感觉类似jsonp)
+	new OpenLayers.Layer.Vector("Vectors", {
+	    projection: new OpenLayers.Projection("EPSG:4326"),
+	    strategies: [new OpenLayers.Strategy.Fixed()],
+	    protocol: new OpenLayers.Protocol.Script({
+	        url: "http://examples.cartodb.com/api/v2/sql",
+	        params: {
+			    q: "select * from costa_rica_pa LIMIT 50",
+			    format: "geojson"
+		    },
+	        format: new OpenLayers.Format.GeoJSON({
+	            ignoreExtraDims: true
+	        }),
+	        callbackKey: "callback"
+	    }),
+	    eventListeners: {
+	        "featuresadded": function() {
+	            this.map.zoomToExtent(this.getDataExtent());
+	        }
+	    }
+	})
+3.Protocol.Script调用跨域wfs
+	 new OpenLayers.Layer.Vector("States", {
+            strategies: [new OpenLayers.Strategy.BBOX()],
+            protocol: new OpenLayers.Protocol.Script({
+                url: "http://suite.opengeo.org/geoserver/wfs",
+                callbackKey: "format_options",
 
 
-七:Strategy策略
+
+九:Format格式
+1.CQL
+//感觉这个放Protocol协议不完了么 过度设计了吧...
+var format = new OpenLayers.Format.CQL();
+filter = format.read(cql.value);
+
+
+
+十:Strategy策略
 1.加载形状时不请求底图
 	new OpenLayers.Layer.Vector("GML", {
 	strategies: [new OpenLayers.Strategy.Fixed()],//数据加载前图层是否可见. 
 
 
 
-八:LonLat坐标
+十一:LonLat坐标
 1.坐标转换
 	//把"EPSG:4326"转换成map.getProjectionObject()类型的坐标
 	new OpenLayers.LonLat(-71.147, 42.472).transform(
 	    new OpenLayers.Projection("EPSG:4326"),
 	    map.getProjectionObject()
-	)	
+	)
+
+
+
+十二:Util工具
+1.extend扩展(猜是遍历拷贝的,回头看源码)
+	this.handlerOptions = OpenLayers.Util.extend(
+	    {}, this.defaultHandlerOptions
+	);
+
+
+
+其他
+1.浏览器检测
+    在examples/browser.js里, 这个一定得好好看看
+    jQuery的检测没看明白, OpenLayers的感觉没有那么多模式, 简单得多
+2.Jugl.js
+	Jugl.js是一个模板库, 资料不多 用法如下:
+	<table id="template">
+        <tr jugl:repeat="row new Array(rows)">
+            <td jugl:repeat="col new Array(cols)" 
+                jugl:attributes="id 'c' + repeat.col.index + 'r' + repeat.row.index">
+                &nbsp;
+            </td>
+        </tr>
+    </table>
+    var template = new jugl.Template("template");
+	template.process({
+	    clone: true,
+	    parent: "inspector",
+	    context: {
+	        rows: rows,
+	        cols: cols
+	    }
+	});
+    相当nb啊, 在支持canvas的浏览器里都可以显示表格效果, 回头研究下怎么弄的
