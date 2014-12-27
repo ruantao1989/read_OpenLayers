@@ -43,6 +43,12 @@
         controls: [],
         numZoomLevels: 6//六级
     });
+9.添加删除气泡
+	//添加气泡
+	map.addPopup(popup, true);
+	//删除
+	map.removePopup(feature.popup);//地图上删掉feature中的popup
+    feature.popup.destroy();//析构
 
 
 
@@ -308,7 +314,99 @@
         color: red;
     }
 	map.addControl(new OpenLayers.Control.MousePosition());
-
+15.地图div范围外拖动
+	new OpenLayers.Control.Navigation({documentDrag: true})
+16.画面工具
+	var draw = new OpenLayers.Control.DrawFeature(
+	    map.layers[1],//是Layer.Vector
+	    OpenLayers.Handler.Polygon,//面
+	    {handlerOptions: {holeModifier: "altKey"}}//alt以后可以在已经存在的面里画出一个洞
+	);
+	map.addControl(draw);
+17.激活/关闭工具
+	//点击某元素后的事件
+	if (element.value === "polygon" && element.checked) {
+        draw.activate();
+    } else {
+        draw.deactivate();
+    }
+18.拾取获得面元素的id
+	function updateOutput(event) {
+	    window.setTimeout(function() {
+	        outputDOM.innerHTML = event.type + " " + event.feature.id;
+	    }, 100);
+	}
+	map.layers[1].events.on({//layers[1]是Layer.Vector
+	    sketchmodified: updateOutput,
+	    sketchcomplete: updateOutput
+	});
+19.画点,线,面,矩形
+	//分别画在不同的
+	drawControls = {
+        point: new OpenLayers.Control.DrawFeature(pointLayer,//new OpenLayers.Layer.Vector("Point Layer");
+            OpenLayers.Handler.Point),
+        line: new OpenLayers.Control.DrawFeature(lineLayer,
+            OpenLayers.Handler.Path),
+        polygon: new OpenLayers.Control.DrawFeature(polygonLayer,
+            OpenLayers.Handler.Polygon),
+        box: new OpenLayers.Control.DrawFeature(boxLayer,//new OpenLayers.Layer.Vector("Box layer");
+            OpenLayers.Handler.RegularPolygon, {
+                handlerOptions: {
+                    sides: 4,
+                    irregular: true
+                }
+            }
+        )
+    };
+    //遍历添加
+    for(var key in drawControls) {
+        map.addControl(drawControls[key]);
+    }
+20.中断绘制点线面
+	var stop = !element.checked;//某dom点击事件
+    for(var key in drawControls) {
+        drawControls[key].handler.stopDown = stop;//停止绘制
+        drawControls[key].handler.stopUp = stop;
+    }
+21.拖动要素
+	drag: new OpenLayers.Control.DragFeature(vectors)
+22.根据的值输入绘制
+	var draw = new OpenLayers.Control.DrawFeature(
+	    map.layers[1], OpenLayers.Handler.Path
+	);
+	map.addControl(draw);
+	draw.activate();
+	// 接收输入值
+	draw.insertXY(values[0], values[1]);//插入位置
+	draw.insertDeltaXY(values[0], values[1]);//和上一次的偏移量
+	draw.insertDirectionLength(values[0], values[1]);//长度
+	draw.insertDeflectionLength(values[0], values[1]);
+	draw.cancel();//取消绘制
+	draw.finishSketch();//完成绘制
+23.工具栏toolbar
+	//嵌在地图内
+	vlayer = new OpenLayers.Layer.Vector( "Editable" );
+	new OpenLayers.Control.EditingToolbar(vlayer)
+	//放在地图外
+	var container = document.getElementById("panel");
+    var panel = new OpenLayers.Control.EditingToolbar(
+        vlayer, /*Layer.Vector*/{div: container}
+    );
+    map.addControl(panel);
+24.类型切换
+	var blue = new OpenLayers.Control({
+        type: OpenLayers.Control.TYPE_TOGGLE,
+        eventListeners: toolListeners,
+        displayClass: "blue"
+    });
+    //事件处理
+    var toolListeners = {
+        "activate": toolActivate,
+        "deactivate": toolDeactivate
+    };
+    function toolActivate(event) {
+        log("activate " + event.object.displayClass);
+    }
 
 
 四:Event事件
@@ -325,6 +423,89 @@
 	    "keydown",
 	    OpenLayers.Function.bindAsEventListener(
 	        function(evt) {
+3.绘制过程中Ctrl-Z 和 Ctrl-Y
+	OpenLayers.Event.observe(document, "keydown", function(evt) {
+	    var handled = false;
+	    switch (evt.keyCode) {
+	        case 90: // z
+	            if (evt.metaKey || evt.ctrlKey) {
+	                draw.undo();
+	                handled = true;
+	            }
+	            break;
+	        case 89: // y
+	            if (evt.metaKey || evt.ctrlKey) {
+	                draw.redo();
+	                handled = true;
+	            }
+	            break;
+	        case 27: // esc
+	            draw.cancel();
+	            handled = true;
+	            break;
+	    }
+	    if (handled) {
+	        OpenLayers.Event.stop(evt);
+	    }
+	});
+4.要素拾取
+	selectControl = new OpenLayers.Control.SelectFeature(layer);
+	map.addControl(selectControl);
+	selectControl.activate();
+	layer.events.on({
+	    'featureselected': onFeatureSelect,//选中
+	    'featureunselected': onFeatureUnselect//不选
+	});
+    function onFeatureSelect(evt) {
+        feature = evt.feature;//event里有feature元素
+        popup = new OpenLayers.Popup.FramedCloud("featurePopup",
+                                 feature.geometry.getBounds().getCenterLonLat(),
+                                 new OpenLayers.Size(100,100),
+                                 "<h2>"+feature.attributes.title + "</h2>" +
+                                 feature.attributes.description,
+                                 null, true, onPopupClose);//构造弹窗
+        feature.popup = popup;//feature和popup相互持有
+        popup.feature = feature;
+        map.addPopup(popup, true);//添加气泡
+    }
+    function onFeatureUnselect(evt) {
+        feature = evt.feature;
+        if (feature.popup) {
+            popup.feature = null;
+            map.removePopup(feature.popup);//地图上删掉feature中的popup
+            feature.popup.destroy();//析构
+            feature.popup = null;
+        }
+    }
+    // Needed only for interaction, not for the display.
+    function onPopupClose(evt) {
+        // 'this' is the popup.
+        var feature = this.feature;
+        if (feature.layer) { //要素存在
+            selectControl.unselect(feature);
+        } else { // After "moveend" or "refresh" events on POIs layer all features have been destroyed by the Strategy.BBOX
+            this.destroy();
+        }
+    }
+5.监听多个事件    
+	map = new OpenLayers.Map('map', {
+	    eventListeners: {
+	        "moveend": mapEvent,
+	        "zoomend": mapEvent,
+	        "changelayer": mapLayerChanged,
+	        "changebaselayer": mapBaseLayerChanged
+	    }
+	});
+	//从event拿到事件源
+	function mapEvent(event) {
+	    log(event.type);
+	}
+	function mapBaseLayerChanged(event) {
+	    log(event.type + " " + event.layer.name);
+	}
+	function mapLayerChanged(event) {
+	    log(event.type + " " + event.layer.name + " " + event.property);
+	}
 
 
 
@@ -344,7 +525,27 @@
 
 
 
-六:Geometry几何
+六:Popup气泡
+1.构造气泡
+	popup = new OpenLayers.Popup.FramedCloud("featurePopup",
+	                                 feature.geometry.getBounds().getCenterLonLat(),
+	                                 new OpenLayers.Size(100,100),
+	                                 "<h2>"+feature.attributes.title + "</h2>" +
+	                                 feature.attributes.description,
+	                                 null, true, onPopupClose);//构造弹窗
+	feature.popup = popup;//feature和popup相互持有
+	popup.feature = feature;
+2.析构气泡
+	if (feature.popup) {
+	    popup.feature = null;
+	    map.removePopup(feature.popup);//地图上删掉feature中的popup
+	    feature.popup.destroy();//析构
+	    feature.popup = null;
+	}        
+
+
+
+七:Geometry几何
 1.在Layer.Vector上绘制几何图形
 	var Geometry = OpenLayers.Geometry;
 	var features = [
@@ -368,7 +569,7 @@
 
 
 
-七:Style样式
+八:Style样式
 1.规则和样式的匹配
 	var Rule = OpenLayers.Rule;
 	var Filter = OpenLayers.Filter;
@@ -394,7 +595,7 @@
 
 
 
-八:Protocol协议
+九:Protocol协议
 1.jsonp图层
 	var jsonp = new OpenLayers.Protocol.Script();
 	jsonp.createRequest(layerURL, {
@@ -428,25 +629,36 @@
             protocol: new OpenLayers.Protocol.Script({
                 url: "http://suite.opengeo.org/geoserver/wfs",
                 callbackKey: "format_options",
+4.调用本地txt中的内容
+	var layer = new OpenLayers.Layer.Vector("POIs", {
+	    strategies: [new OpenLayers.Strategy.BBOX({resFactor: 1.1})],
+	    protocol: new OpenLayers.Protocol.HTTP({
+	        url: "textfile.txt",
+	        format: new OpenLayers.Format.Text()
+	    })
+	});
 
 
 
-九:Format格式
+十:Format格式
 1.CQL
-//感觉这个放Protocol协议不完了么 过度设计了吧...
-var format = new OpenLayers.Format.CQL();
-filter = format.read(cql.value);
+	//感觉这个放Protocol协议不完了么 过度设计了吧...
+	var format = new OpenLayers.Format.CQL();
+	filter = format.read(cql.value);
+2.编码的Polyline
+	var format = new OpenLayers.Format.EncodedPolyline({geometryType:"polygon"});
+	vector_layer.addFeatures(format.read(encoded));//Layer.Vector
 
 
 
-十:Strategy策略
+十一:Strategy策略
 1.加载形状时不请求底图
 	new OpenLayers.Layer.Vector("GML", {
 	strategies: [new OpenLayers.Strategy.Fixed()],//数据加载前图层是否可见. 
 
 
 
-十一:LonLat坐标
+十二:LonLat坐标
 1.坐标转换
 	//把"EPSG:4326"转换成map.getProjectionObject()类型的坐标
 	new OpenLayers.LonLat(-71.147, 42.472).transform(
@@ -456,11 +668,25 @@ filter = format.read(cql.value);
 
 
 
-十二:Util工具
+十三:Util工具
 1.extend扩展(猜是遍历拷贝的,回头看源码)
 	this.handlerOptions = OpenLayers.Util.extend(
 	    {}, this.defaultHandlerOptions
 	);
+2.接收url传参
+	//最后的.param是参数名, 如?param=XXXX
+	OpenLayers.Util.getParameters(window.location.href).param
+
+
+
+十四:Console控制台
+1.使用Console
+	//引入"/lib/Firebug/firebug.js", 回头得看看这个控制台怎么实现的
+	OpenLayers.Console.log()
+	OpenLayers.Console.warn()
+	OpenLayers.Console.error()
+	OpenLayers.Console.dir()
+	OpenLayers.Console.dirxml()
 
 
 
