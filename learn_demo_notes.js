@@ -49,6 +49,48 @@
 	//删除
 	map.removePopup(feature.popup);//地图上删掉feature中的popup
     feature.popup.destroy();//析构
+10.声明事件监听
+	var map = new OpenLayers.Map({
+		... ...
+	    eventListeners: {
+	        featureover: function(e) {
+	            e.feature.renderIntent = "select";
+	            e.feature.layer.drawFeature(e.feature);
+	            log("Map says: Pointer entered " + e.feature.id + " on " + e.feature.layer.name);
+	        },
+	        featureout: function(e) {
+	            e.feature.renderIntent = "default";
+	            e.feature.layer.drawFeature(e.feature);
+	            log("Map says: Pointer left " + e.feature.id + " on " + e.feature.layer.name);
+	        },
+	        featureclick: function(e) {
+	            log("Map says: " + e.feature.id + " clicked on " + e.feature.layer.name);
+	        }
+	    }
+	});
+11.zoom值取整
+	map.zoomTo(Math.round(map.zoom));
+12.全屏地图
+	html, body, #map {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+    }
+13.Ajax跨域
+	//这个回头得看看源码
+	OpenLayers.ProxyHost = "/proxy/?url=";
+14.添加气泡
+	map.addPopup(new OpenLayers.Popup.FramedCloud(
+        "chicken", 
+        map.getLonLatFromPixel(event.xy),
+        null,
+        event.text,
+        null,
+        true
+    ));
+15.叠加全都图层
+	//而不是按需显示
+	new OpenLayers.Map('map', {allOverlays: true});
 
 
 
@@ -63,7 +105,6 @@
 3.json数据图层
 	map = new OpenLayers.Map({
 	    div: "map",
-	    allOverlays: true,//这种图层必须allOverlays: true
 	    maxExtent: new OpenLayers.Bounds(
 	        1549471.9221, 6403610.94, 1550001.32545, 6404015.8
 	    )
@@ -159,7 +200,63 @@
 	    }
 	})
 13.canvas绘图元素
-	
+	var wfs = new OpenLayers.Layer.Vector("States", {
+       	... ...
+        renderers: ["Canvas", "SVG", "VML"]
+    });
+14.Vector上绘制GeoJSON
+	var vector = new OpenLayers.Layer.Vector("GeoJSON", {
+	    ...
+	    protocol: new OpenLayers.Protocol.HTTP({
+	        url: "geojson-reprojected.json",
+	        format: new OpenLayers.Format.GeoJSON()
+	    })
+	});
+15.xml加载GeoRSS图层
+	var newl = new OpenLayers.Layer.GeoRSS(
+16.自定义图片图标加在GeoRSS图层上
+	var yelp = new OpenLayers.Icon("http://www.openlayers.org/images/OpenLayers.trac.png", new OpenLayers.Size(49,44));
+    var newl = new OpenLayers.Layer.GeoRSS( 'Yelp GeoRSS', 'yelp-georss.xml', {'icon':yelp});
+    map.addLayer(newl);
+17.GML图层
+	 map.addLayer(new OpenLayers.Layer.Vector("GML", {
+	    protocol: new OpenLayers.Protocol.HTTP({
+	        url: "gml/polygon.xml",
+	        format: new OpenLayers.Format.GML()
+	    }),
+18.google图层
+	var gphy = new OpenLayers.Layer.Google(
+        "Google Physical",
+        {type: G_PHYSICAL_MAP}
+    );
+19.静态网格图层
+	//有点儿wmts的意思
+	new OpenLayers.Layer.Grid(
+        "Google Streets",
+        "http://maps.googleapis.com/maps/api/staticmap?sensor=false&maptype=roadmap", 
+        null, options
+    ),
+    var options = {
+	    singleTile: true,
+	    ratio: 1,
+	    isBaseLayer: true,
+	    wrapDateLine: true,
+	    getURL: function() {
+	        var center = this.map.getCenter().transform("EPSG:3857", "EPSG:4326"),
+	            size = this.map.getSize();
+	        return [
+	            this.url, "&center=", center.lat, ",", center.lon,
+	            "&zoom=", this.map.getZoom(), "&size=", size.w, "x", size.h
+	        ].join("");
+	    }
+	};
+20.gutter沟槽
+	//这个不知道干嘛用的, 是个纯地质学的概念, 不太理解
+	//查得gutter的值会影响imageSize和imageOffset
+	new OpenLayers.Layer.WMS( "States (15px gutter)",
+		  "http://suite.opengeo.org/geoserver/wms",
+		  {layers: 'usa:states'},
+		  {gutter: 15,
 
 
 
@@ -407,6 +504,48 @@
     function toolActivate(event) {
         log("activate " + event.object.displayClass);
     }
+25.获取客户端位置
+	//获得html5中的位置信息
+	var geolocate = new OpenLayers.Control.Geolocate({
+	    bind: false,
+	    geolocationOptions: {
+	        enableHighAccuracy: false,
+	        maximumAge: 0,
+	        timeout: 7000
+	    }
+	});
+	//事件
+	geolocate.events.register("locationupdated",geolocate,function(e) {
+26.WMS获取要素信息
+	click: new OpenLayers.Control.WMSGetFeatureInfo({
+        url: 'http://demo.opengeo.org/geoserver/wms', 
+        title: 'Identify features by clicking',
+        layers: [water],
+        queryVisible: true,
+            eventListeners: {
+                getfeatureinfo: function(event) {
+                	... ...
+                }
+    })
+27.WFS获取要素信息
+	control = new OpenLayers.Control.GetFeature({
+        protocol: OpenLayers.Protocol.WFS.fromWMSLayer(layer),
+        box: true,
+        hover: true,
+        multipleKey: "shiftKey",
+        toggleKey: "ctrlKey"
+    });
+    control.events.register("featureselected", this, function(e) {
+        select.addFeatures([e.feature]);
+    });
+28.格子线
+	//这个好像是经纬线的网格
+	//实例中还有一种是类似镜头评测里的分辨率线,是wms图层叠加的
+	graticuleCtl1 = new OpenLayers.Control.Graticule({
+	    numPoints: 2, 
+	    labelled: true
+	});
+
 
 
 四:Event事件
@@ -521,7 +660,38 @@
 	point.geometry.clearBounds();
 	vectorLayer.addFeatures([point], {silent: true});//addFeatures()仅仅是Layer.Vector的方法,也就说要画在Layer.Vector上
 	vectorLayer.drawFeature(point, this.style);//Layer.Vector图层上绘制
-2.
+2.要素事件
+	var layer1 = new OpenLayers.Layer.Vector("Layer1", {
+	    styleMap: style,
+	    eventListeners: layerListeners//在Layer.Vector上画要素
+	});
+	//事件监听
+	var layerListeners = {
+	    featureclick: function(e) {
+	        log(e.object.name + " says: " + e.feature.id + " clicked.");
+	        return false;
+	    },
+	    nofeatureclick: function(e) {
+	        log(e.object.name + " says: No feature clicked.");
+	    }
+	};
+3.要素动态绘制在地图中心
+	function adjustLocation(delta, feature) {
+        feature.geometry.move(delta.x, delta.y);
+        var me = map.maxExtent; 
+        var rad = 6;
+        if (feature.geometry.x > (me.right - rad)) { 
+            feature.geometry.x = me.right - rad;
+        } else if (feature.geometry.x < (me.left+rad)) {
+            feature.geometry.x = me.left+rad;
+        } 
+        if (feature.geometry.y > (me.top-rad)) {
+            feature.geometry.y = me.top-rad;
+        } else if (feature.geometry.y < (me.bottom+rad)) {
+            feature.geometry.y = me.bottom+rad;
+        }    
+        vlayer.drawFeature(feature);
+    }
 
 
 
@@ -566,7 +736,17 @@
 	var select = new OpenLayers.Control.SelectFeature(layer);
 	map.addControl(select);
 	select.activate();
-
+2.自定义符号
+	//想了一下还是把OpenLayers.Renderer放在这里吧
+	//扩展了几个符号
+	OpenLayers.Renderer.symbol.lightning = [0, 0, 4, 2, 6, 0, 10, 5, 6, 3, 4, 5, 0, 0];
+	OpenLayers.Renderer.symbol.rectangle = [0, 0, 4, 0, 4, 10, 0, 10, 0, 0];
+	OpenLayers.Renderer.symbol.church = [4, 0, 6, 0, 6, 4, 10, 4, 10, 6, 6, 6, 6, 14, 4, 14, 4, 6, 0, 6, 0, 4, 4, 4, 4, 0];
+3.添加符号
+	var graphics = ["star", "cross", "x", "square", "triangle", "circle", "lightning", "rectangle", "church"];
+	new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(..., 0), {
+            type: graphics[i]
+        });
 
 
 八:Style样式
@@ -637,6 +817,20 @@
 	        format: new OpenLayers.Format.Text()
 	    })
 	});
+5.叠加flickr照片
+	//被墙了 看不见效果
+	new OpenLayers.Layer.Vector("Some images from Flickr", {
+        protocol: new OpenLayers.Protocol.HTTP({
+            url: "xml/georss-flickr.xml",
+            format: new OpenLayers.Format.GeoRSS({
+                // adds the thumbnail attribute to the feature
+                createFeatureFromItem: function(item) {
+                    var feature = OpenLayers.Format.GeoRSS.prototype.createFeatureFromItem.apply(this, arguments);
+                    feature.attributes.thumbnail = this.getElementsByTagNameNS(item, "*", "thumbnail")[0].getAttribute("url");
+                    return feature;
+                }
+            })
+        }),
 
 
 
@@ -648,6 +842,16 @@
 2.编码的Polyline
 	var format = new OpenLayers.Format.EncodedPolyline({geometryType:"polygon"});
 	vector_layer.addFeatures(format.read(encoded));//Layer.Vector
+3.过滤
+	//是个空间过滤器, 查了一下可以用来过滤和比较范围
+	var filter_1_0 = new OpenLayers.Format.Filter({version: "1.0.0"});
+    var filter_1_1 = new OpenLayers.Format.Filter({version: "1.1.0"});
+	var xml = new OpenLayers.Format.XML();
+	value = xml.write(filter_1_0.write(filter));
+4.GeoJSON
+	//js定义一个GeoJSON格式的对象
+	var geojson_format = new OpenLayers.Format.GeoJSON();
+	vector_layer.addFeatures(geojson_format.read(featurecollection));
 
 
 
@@ -690,6 +894,17 @@
 
 
 
+十五:Filter过滤器
+1.比较过滤器
+	filter = new OpenLayers.Filter.Comparison({
+	    type: OpenLayers.Filter.Comparison.BETWEEN,
+	    property: "when",
+	    lowerBoundary: startDate,
+	    upperBoundary: new Date(startDate.getTime() + (parseInt(spanEl.value, 10) * 1000))
+	});
+
+
+
 其他
 1.浏览器检测
     在examples/browser.js里, 这个一定得好好看看
@@ -714,3 +929,6 @@
 	    }
 	});
     相当nb啊, 在支持canvas的浏览器里都可以显示表格效果, 回头研究下怎么弄的
+ 3.Ajax跨域
+	//这个回头得看看源码, 看看他纯前端怎么个思路
+	OpenLayers.ProxyHost = "/proxy/?url=";   
