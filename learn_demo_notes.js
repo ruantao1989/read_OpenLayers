@@ -91,6 +91,8 @@
 15.叠加全都图层
 	//而不是按需显示
 	new OpenLayers.Map('map', {allOverlays: true});
+16.渲染在指定dom上
+	map.render("container_id");
 
 
 
@@ -257,6 +259,50 @@
 		  "http://suite.opengeo.org/geoserver/wms",
 		  {layers: 'usa:states'},
 		  {gutter: 15,
+21.图像图层
+	var graphic = new OpenLayers.Layer.Image(
+        'City Lights',
+        'data/4_m_citylights_lg.gif',
+        new OpenLayers.Bounds(-180, -88.759, 180, 88.759),
+        new OpenLayers.Size(580, 288),
+        {numZoomLevels: 3}
+    );
+22.KaMap图层
+	var jpl_wms = new OpenLayers.Layer.KaMap( "Satellite",
+	    "http://www.openlayers.org/world/index.php", {g: "satellite", map: "world"});
+23.绘制KML轨迹
+	new OpenLayers.Map({
+        div: "map",
+        projection: mercator,
+        layers: [
+				... ...
+                eventListeners: {
+                    "beforefeaturesadded": function(e) {
+                        // group the tracks by fid and create one track for
+                        // every fid
+                        var fid, points = [], feature;
+                        for (var i=0, len=e.features.length; i<len; i++) {
+                            feature = e.features[i];
+                            if ((fid && feature.fid !== fid) || i === len-1) {
+                                this.addNodes(points, {silent: true});
+                                points = [];
+                            } else {
+                                points.push(feature);
+                            }
+                            fid = feature.fid;
+                        }
+                        return false;
+                    }
+                }
+24.图层加载事件
+	layer.events.register("loadstart", layer, function() {
+        this.logEvent("Load Start");
+    });
+    layer.events.register("tileloaded", layer, function() {
+        this.logEvent("Tile loaded. " + this.numLoadingTiles + " left.");
+    });
+25.WMS图层透明度
+	shade.setOpacity(newOpacity);//shade是Layer.WMS
 
 
 
@@ -545,6 +591,68 @@
 	    numPoints: 2, 
 	    labelled: true
 	});
+29.要素选择器
+	= new OpenLayers.Control.SelectFeature(vectors, {
+            hover: true,
+            highlightOnly: true,
+            renderIntent: "temporary",
+            eventListeners: {
+                beforefeaturehighlighted: report,
+                featurehighlighted: report,
+                featureunhighlighted: report
+            }
+        });
+30.hover悬浮控件
+	'long': new OpenLayers.Control.Hover({
+	        handlerOptions: {
+	            'delay': 2000
+	        }
+	    }),
+	'untolerant': new OpenLayers.Control.Hover({
+            handlerOptions: {
+                'delay': 1000,
+                'pixelTolerance': 1
+            }
+        }),
+        'stoppropag': new OpenLayers.Control.Hover({
+            handlerOptions: {
+                'stopMove': true
+            }
+        })
+31.拖拽释放后,地图继续滑动
+	new OpenLayers.Control.Navigation(
+        {dragPanOptions: {enableKinetic: true}}
+    )
+32.在Vector上加载KML文件
+	new OpenLayers.Layer.Vector("KML", {
+        strategies: [new OpenLayers.Strategy.Fixed()],
+        protocol: new OpenLayers.Protocol.HTTP({
+            url: "kml/lines.kml",
+            format: new OpenLayers.Format.KML({
+                extractStyles: true, 
+                extractAttributes: true,
+                maxDepth: 2
+            })
+        })
+    })
+34.使用DOMcss样式的LayerSwitcher
+	map.addControl(new OpenLayers.Control.LayerSwitcher({'div':OpenLayers.Util.getElement('layerswitcher')}));
+35.点要素的点击弹出气泡
+	var vector = new OpenLayers.Layer.Vector("Points",{
+        eventListeners:{
+            'featureselected':function(evt){
+                var feature = evt.feature;
+                var popup = new OpenLayers.Popup.FramedCloud("popup",
+                    OpenLayers.LonLat.fromString(feature.geometry.toShortString()),
+                    null,
+                    "<div style='font-size:.8em'>Feature: " + feature.id +"<br>Foo: " + feature.attributes.foo+"</div>",
+                    null,
+                    true
+                );
+                feature.popup = popup;
+                map.addPopup(popup);
+            },
+            'featureunselected':function(evt){
 
 
 
@@ -692,19 +800,26 @@
         }    
         vlayer.drawFeature(feature);
     }
+4.WKT格式要素
+	var feature2 = new OpenLayers.Feature.Vector(
+        OpenLayers.Geometry.fromWKT(
+            "POLYGON((-120.828125 -50.3515625, -80.1875 -80.0078125, -40.40625 -20.4140625, -120.828125 -50.3515625))"
+        )
+    );
 
 
 
 六:Popup气泡
 1.构造气泡
 	popup = new OpenLayers.Popup.FramedCloud("featurePopup",
-	                                 feature.geometry.getBounds().getCenterLonLat(),
-	                                 new OpenLayers.Size(100,100),
-	                                 "<h2>"+feature.attributes.title + "</h2>" +
-	                                 feature.attributes.description,
-	                                 null, true, onPopupClose);//构造弹窗
+                     feature.geometry.getBounds().getCenterLonLat(),
+                     new OpenLayers.Size(100,100),
+                     "<h2>"+feature.attributes.title + "</h2>" +
+                     feature.attributes.description,
+                     null, true, onPopupClose);//构造弹窗
 	feature.popup = popup;//feature和popup相互持有
 	popup.feature = feature;
+	map.addPopup();
 2.析构气泡
 	if (feature.popup) {
 	    popup.feature = null;
@@ -747,6 +862,15 @@
 	new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(..., 0), {
             type: graphics[i]
         });
+4.绘制点
+	features[i] = new OpenLayers.Feature.Vector(
+        new OpenLayers.Geometry.Point(
+            (360 * Math.random()) - 180, (180 * Math.random()) - 90
+        ), {
+            type: 5 + parseInt(5 * Math.random())
+        }
+    );
+
 
 
 八:Style样式
@@ -852,7 +976,13 @@
 	//js定义一个GeoJSON格式的对象
 	var geojson_format = new OpenLayers.Format.GeoJSON();
 	vector_layer.addFeatures(geojson_format.read(featurecollection));
-
+5.将要素序列化为GeoJson
+	geojson = new OpenLayers.Format.GeoJSON();
+	var str = geojson.write(vectors.features, true);
+6.将KML转文本
+     g =  new OpenLayers.Format.KML({extractStyles: true});
+     features = g.read(req.responseText);
+	
 
 
 十一:Strategy策略
@@ -880,7 +1010,8 @@
 2.接收url传参
 	//最后的.param是参数名, 如?param=XXXX
 	OpenLayers.Util.getParameters(window.location.href).param
-
+3.DOM查询
+	OpenLayers.Util.getElement('opacity').value
 
 
 十四:Console控制台
@@ -903,6 +1034,12 @@
 	    upperBoundary: new Date(startDate.getTime() + (parseInt(spanEl.value, 10) * 1000))
 	});
 
+
+十六:Request请求
+	 OpenLayers.Request.GET({
+            url: "kml/lines.kml",
+            success: parseData
+        });
 
 
 其他
