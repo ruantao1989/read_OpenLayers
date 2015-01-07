@@ -93,6 +93,11 @@
 	new OpenLayers.Map('map', {allOverlays: true});
 16.渲染在指定dom上
 	map.render("container_id");
+17.设置地图最大范围
+	//拖动边界
+	var extent = new OpenLayers.Bounds(8, 44.5, 19, 50);
+	map.setOptions({restrictedExtent: extent});
+	//map.setOptions({restrictedExtent: null});
 
 
 
@@ -303,6 +308,90 @@
     });
 25.WMS图层透明度
 	shade.setOpacity(newOpacity);//shade是Layer.WMS
+26.XYZ图层
+	var earth = new OpenLayers.Layer.XYZ(
+27.MapGuide图层
+	var layer = new OpenLayers.Layer.MapGuide(
+28.MapServer图层
+	layer = new OpenLayers.Layer.MapServer(
+29.文字图层
+	new OpenLayers.Layer.Text( "text", { location:"./textfile.txt"} );
+30.maker压盖顺序
+	var layer = new OpenLayers.Layer.Vector(
+        "Y-Order",
+        {
+ 			...	...
+            rendererOptions: {yOrdering: true},
+            renderers: renderer
+        }
+    );
+	var layer = new OpenLayers.Layer.Vector(
+        "Drawing Order",
+        {
+            isBaseLayer: true,
+            // enable the indexer by setting zIndexing to true
+            rendererOptions: {zIndexing: true}
+        }
+    );
+31.OSM在Canvas画布上的事件
+    layer = new OpenLayers.Layer.OSM('Simple OSM Map', null, {
+        eventListeners: {
+            tileloaded: function(evt) {
+                var ctx = evt.tile.getCanvasContext();
+                if (ctx) {
+                    var imgd = ctx.getImageData(0, 0, evt.tile.size.w, evt.tile.size.h);
+                    var pix = imgd.data;
+                    for (var i = 0, n = pix.length; i < n; i += 4) {
+                        pix[i] = pix[i + 1] = pix[i + 2] = (3 * pix[i] + 4 * pix[i + 1] + pix[i + 2]) / 8;
+                    }
+                    ctx.putImageData(imgd, 0, 0);
+32.点阵
+	var points = new OpenLayers.Layer.PointGrid({
+	    isBaseLayer: true, dx: 15, dy: 15
+	});
+33.GeoRSS
+	rss = new OpenLayers.Layer.GeoRSS(parts[parts.length-1], value);
+34.坐标系切换
+	'EPSG:3574': {
+        projection: new OpenLayers.Projection('EPSG:3574'),
+        units: 'm',
+        maxExtent: new OpenLayers.Bounds(-5505054, -5505054, 5505054, 5505054),
+        maxResolution: 5505054 / 128,
+        numZoomLevels: 18
+    },
+    //切换坐标系
+    function setProjection() {
+	    projCode = this.innerHTML;
+	    var oldExtent = map.getExtent();
+	    var oldCenter = map.getCenter();
+	    var oldProjection = map.getProjectionObject();
+	    // map projection is controlled by the base layer
+	    map.baseLayer.addOptions(projectionOptions[projCode]);
+	    // with the base layer updated, the map has the new projection now
+	    var newProjection = map.getProjectionObject();
+	    // transform the center of the old projection, not the extent
+	    map.setCenter(
+	        oldCenter.transform(oldProjection, newProjection,
+	        map.getZoomForExtent(oldExtent.transform(oldProjection, newProjection))
+	    ));
+	    for (var i=map.layers.length-1; i>=0; --i) {
+	        // update grid settings
+	        map.layers[i].addOptions(projectionOptions[projCode]);
+	        // redraw layer - just in case center and zoom are the same in old and
+	        // new projection
+	        map.layers[i].redraw();
+	    }
+	}
+35.shift和ctrl画矩形
+	polyOptions = {sides: 4};
+    polygonControl = new OpenLayers.Control.DrawFeature(polygonLayer,
+                                    OpenLayers.Handler.RegularPolygon,
+                                    {handlerOptions: polyOptions});
+    //配置,形状:shape==>"3" triangle ,"4"  square,"5" pentagon ,"6" hexagon "40" circle
+    polygonControl.handler.setOptions(options);
+    //
+    var radius = fraction * map.getExtent().getHeight();
+    polygonControl.handler.setOptions({radius: radius,angle: 0});
 
 
 
@@ -653,6 +742,107 @@
                 map.addPopup(popup);
             },
             'featureunselected':function(evt){
+36.ctrl键功能            	
+	measureControls = {
+        line: new OpenLayers.Control.Measure(
+            OpenLayers.Handler.Path, {
+                persist: true,
+                handlerOptions: {
+                    layerOptions: {
+                        renderers: renderer,
+                        styleMap: styleMap
+                    }
+                }
+            }
+        ),
+        polygon: new OpenLayers.Control.Measure(
+            OpenLayers.Handler.Polygon, {
+                persist: true,
+                handlerOptions: {
+                    layerOptions: {
+                        renderers: renderer,
+                        styleMap: styleMap
+                    }
+                }
+            }
+        )
+    };
+37.修改要素
+	modify: new OpenLayers.Control.ModifyFeature(vectors)
+	//模式 controls.modify.mode = 
+	OpenLayers.Control.ModifyFeature.RESHAPE;
+	OpenLayers.Control.ModifyFeature.ROTATE;
+	OpenLayers.Control.ModifyFeature.RESIZE;
+	OpenLayers.Control.ModifyFeature.RESHAPE;
+	OpenLayers.Control.ModifyFeature.DRAG;
+38.鼠标滚轮zoom延迟
+	 new OpenLayers.Control.Navigation(
+            {mouseWheelOptions: {interval: 100}}
+        )
+39.是否允许鼠标滚轮zoom
+	nav = new OpenLayers.Control.Navigation({'zoomWheelEnabled': false});
+	//使能
+	nav.enableZoomWheel();return false;
+	nav.disableZoomWheel(); return false;
+40.导航控件,前进后退
+	nav = new OpenLayers.Control.NavigationHistory();
+	panel = new OpenLayers.Control.Panel(
+        {div: document.getElementById("panel")}
+    );
+    panel.addControls([nav.next, nav.previous]);
+41.小手或者放大镜
+	new OpenLayers.Control.PanZoom()
+42.总是zoom
+	new OpenLayers.Control.ZoomBox({alwaysZoom:true})
+43.离线缓存
+	//写
+	cacheWrite = new OpenLayers.Control.CacheWrite({
+        imageFormat: "image/jpeg",
+        eventListeners: {
+            cachefull: function() {
+                if (seeding) {
+                    stopSeeding();
+                }
+                status.innerHTML = "Cache full.";
+            }
+        }
+    });
+	// try cache before loading from remote resource
+    cacheRead1 = new OpenLayers.Control.CacheRead({
+        eventListeners: {
+            activate: function() {
+                cacheRead2.deactivate();
+            }
+        }
+    });
+    // try loading from remote resource and fall back to cache
+    cacheRead2 = new OpenLayers.Control.CacheRead({
+        autoActivate: false,
+        fetchEvent: "tileerror",
+        eventListeners: {
+            activate: function() {
+                cacheRead1.deactivate();
+            }
+        }
+    });
+44.鸟瞰图
+	var overview1 = new OpenLayers.Control.OverviewMap({
+        maximized: true,
+        maximizeTitle: 'Show the overview map',
+        minimizeTitle: 'Hide the overview map'
+    });
+45.自定义Panel
+    zb = new OpenLayers.Control.ZoomBox(
+    {title:"Zoom box: Selecting it you can zoom on an area by clicking and dragging."});
+    var panel = new OpenLayers.Control.Panel({defaultControl: zb});
+    panel.addControls([
+        zb,
+        new OpenLayers.Control.DrawFeature(vlayer, OpenLayers.Handler.Path,
+            {title:'Draw a feature'}),
+        new OpenLayers.Control.ZoomToMaxExtent({title:"Zoom to the max extent"}) 
+    ]);
+46.上下左右箭头
+	new OpenLayers.Control.PanPanel(),
 
 
 
@@ -753,6 +943,11 @@
 	function mapLayerChanged(event) {
 	    log(event.type + " " + event.layer.name + " " + event.property);
 	}
+6.鼠标位置
+	map.events.register("mousemove", map, function(e) {
+        var position = this.events.getMousePosition(e);
+        OpenLayers.Util.getElement("coords").innerHTML = position;
+    });
 
 
 
@@ -806,6 +1001,17 @@
             "POLYGON((-120.828125 -50.3515625, -80.1875 -80.0078125, -40.40625 -20.4140625, -120.828125 -50.3515625))"
         )
     );
+5.改变要素大小
+	var origin = new OpenLayers.Geometry.Point(-111.04, 45.68);
+    pointFeature.geometry.resize(scale, origin);
+    lineFeature.geometry.resize(scale, origin);
+    polygonFeature.geometry.resize(scale, origin);
+    vectorLayer.redraw();
+6.要素旋转
+	//源
+	var origin = new OpenLayers.Geometry.Point(-111.04, 45.68);
+    feature.geometry.rotate(360 / 20, origin);
+    feature.layer.drawFeature(feature);
 
 
 
@@ -827,10 +1033,43 @@
 	    feature.popup.destroy();//析构
 	    feature.popup = null;
 	}        
+3.气泡里用html内容
+    var popup = new OpenLayers.Popup.FramedCloud("Popup", 
+        myLocation.getBounds().getCenterLonLat(), null,
+        '<a target="_blank" href="http://openlayers.org/">We</a> ' +
+        'could be here.<br>Or elsewhere.', null,
+        true // <-- true if we want a close (X) button, false otherwise
+    );
 
 
 
-七:Geometry几何
+七.Makers标点
+1.创建点
+	//准备一个画布
+	var markersLayer = new OpenLayers.Layer.Markers( "Markers" );
+    map.addLayer(markersLayer);
+    var size = new OpenLayers.Size(21,25);
+    var offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+    var icon = new OpenLayers.Icon('http://www.openlayers.org/dev/img/marker.png',size,offset);
+    //由经纬度对象 + 图表对象 复合而成
+    marker = new OpenLayers.Marker(new OpenLayers.LonLat(90,10),icon.clone());
+    marker.setOpacity(0.2);
+    markersLayer.addMarker(marker);
+2.调整maker尺寸
+	size = new OpenLayers.Size(size.w + 10, size.h + 10);
+    icon.setSize(size);
+3.maker阴影
+	//其实是背景图片, 倒是兼容性最佳的方法
+	styleMap: new OpenLayers.StyleMap({
+            externalGraphic: "../img/marker-gold.png",
+            backgroundGraphic: "./img/marker_shadow.png",
+4.mark点击弹窗
+	//对应关系在textfile.txt里
+	var newl = new OpenLayers.Layer.Text( "text", {location: "./textfile.txt"} );
+
+
+
+八:Geometry几何
 1.在Layer.Vector上绘制几何图形
 	var Geometry = OpenLayers.Geometry;
 	var features = [
@@ -873,7 +1112,7 @@
 
 
 
-八:Style样式
+九:Style样式
 1.规则和样式的匹配
 	var Rule = OpenLayers.Rule;
 	var Filter = OpenLayers.Filter;
@@ -899,7 +1138,7 @@
 
 
 
-九:Protocol协议
+十:Protocol协议
 1.jsonp图层
 	var jsonp = new OpenLayers.Protocol.Script();
 	jsonp.createRequest(layerURL, {
@@ -958,7 +1197,7 @@
 
 
 
-十:Format格式
+十一:Format格式
 1.CQL
 	//感觉这个放Protocol协议不完了么 过度设计了吧...
 	var format = new OpenLayers.Format.CQL();
@@ -985,24 +1224,25 @@
 	
 
 
-十一:Strategy策略
+十二:Strategy策略
 1.加载形状时不请求底图
 	new OpenLayers.Layer.Vector("GML", {
 	strategies: [new OpenLayers.Strategy.Fixed()],//数据加载前图层是否可见. 
 
 
 
-十二:LonLat坐标
+十三:LonLat坐标
 1.坐标转换
 	//把"EPSG:4326"转换成map.getProjectionObject()类型的坐标
 	new OpenLayers.LonLat(-71.147, 42.472).transform(
 	    new OpenLayers.Projection("EPSG:4326"),
 	    map.getProjectionObject()
 	)
+十四:边界
+	var extent = new OpenLayers.Bounds(8, 44.5, 19, 50);
 
 
-
-十三:Util工具
+十五:Util工具
 1.extend扩展(猜是遍历拷贝的,回头看源码)
 	this.handlerOptions = OpenLayers.Util.extend(
 	    {}, this.defaultHandlerOptions
@@ -1014,7 +1254,8 @@
 	OpenLayers.Util.getElement('opacity').value
 
 
-十四:Console控制台
+
+十六:Console控制台
 1.使用Console
 	//引入"/lib/Firebug/firebug.js", 回头得看看这个控制台怎么实现的
 	OpenLayers.Console.log()
@@ -1025,7 +1266,7 @@
 
 
 
-十五:Filter过滤器
+十七:Filter过滤器
 1.比较过滤器
 	filter = new OpenLayers.Filter.Comparison({
 	    type: OpenLayers.Filter.Comparison.BETWEEN,
@@ -1035,11 +1276,29 @@
 	});
 
 
-十六:Request请求
-	 OpenLayers.Request.GET({
-            url: "kml/lines.kml",
-            success: parseData
-        });
+
+十八:Request请求
+1.get请求
+	OpenLayers.Request.GET({
+	    url: "kml/lines.kml",
+	    success: parseData
+	});
+2.post请求 
+	OpenLayers.Request.POST({
+	    url: "http://www.openrouteservice.org/php/OpenLSLUS_Geocode.php",
+	    scope: this,
+	    failure: this.requestFailure,
+	    success: this.requestSuccess,
+	    headers: {"Content-Type": "application/x-www-form-urlencoded"},
+	    data: "FreeFormAdress=" + encodeURIComponent(queryString) + "&MaxResponse=1"
+	});
+
+
+
+十九:Size尺寸
+	size = new OpenLayers.Size(size.w + 10, size.h + 10);
+    icon.setSize(size);
+
 
 
 其他
@@ -1068,4 +1327,5 @@
     相当nb啊, 在支持canvas的浏览器里都可以显示表格效果, 回头研究下怎么弄的
  3.Ajax跨域
 	//这个回头得看看源码, 看看他纯前端怎么个思路
-	OpenLayers.ProxyHost = "/proxy/?url=";   
+	OpenLayers.ProxyHost = "/proxy/?url=";
+
