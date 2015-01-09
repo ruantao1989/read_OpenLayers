@@ -117,6 +117,11 @@
         pointRadius: "${getSize}", // using context.getSize(feature)
         fillColor: "${getColor}" // using context.getColor(feature)
     };
+20.zoom值的计算
+	minResolution: "auto",
+    minExtent: new OpenLayers.Bounds(-1, -1, 1, 1),
+    maxResolution: "auto",
+    maxExtent: new OpenLayers.Bounds(-180, -90, 180, 90)
 
 
 
@@ -432,6 +437,32 @@
 	    utfgridResolution: 4, // default is 2
 	    displayInLayerSwitcher: false
 	});
+41.WMS长url
+	var base = new OpenLayers.Layer.WMS(
+	base.mergeNewParams({makeTheUrlLong: longText});
+	var string = OpenLayers.Util.getElement('year').value + "-" +
+                         OpenLayers.Util.getElement('month').value + "-" +
+                         OpenLayers.Util.getElement('day').value + "T" +
+                         OpenLayers.Util.getElement('hour').value + ":" +
+                         OpenLayers.Util.getElement('minute').value + ":00";
+	base.mergeNewParams({'time':string});
+42.WMTS图层
+	var wmts = new OpenLayers.Layer.WMTS({
+        name: "Medford Buildings",
+        url: "http://v2.suite.opengeo.org/geoserver/gwc/service/wmts/",
+        layer: "medford:buildings",
+        matrixSet: "EPSG:900913",
+        matrixIds: matrixIds,
+        format: "image/png",
+        style: "_null",
+        opacity: 0.7,
+        isBaseLayer: false
+    });  
+43.WorldWind图层
+	new OpenLayers.Layer.WorldWind
+44.Zoomify图层
+    var zoomify = new OpenLayers.Layer.Zoomify( "Zoomify", zoomify_url, 
+		new OpenLayers.Size( zoomify_width, zoomify_height ) );
 
 
 
@@ -939,6 +970,42 @@
 	        }
 	    }
 	};
+54.wfs编辑图形,并保存
+	//编辑
+	 var edit = new OpenLayers.Control.ModifyFeature(wfs, {
+        title: "Modify Feature",
+        displayClass: "olControlModifyFeature"
+    });
+	//保存
+	var saveStrategy = new OpenLayers.Strategy.Save();
+	if(edit.feature) {
+        edit.selectControl.unselectAll();
+    }
+    saveStrategy.save();
+55.wfs的Snapping和Split
+	// configure the snapping agent
+    var snap = new OpenLayers.Control.Snapping({layer: wfs});
+    // configure split agent
+    var split = new OpenLayers.Control.Split({
+        layer: wfs,
+        source: wfs,
+56.wfs矢量图层叠加
+	new OpenLayers.Layer.Vector("States", {
+        minScale: 15000000,
+        strategies: [new OpenLayers.Strategy.BBOX()],
+        protocol: new OpenLayers.Protocol.WFS({
+            url: "http://demo.opengeo.org/geoserver/wfs",
+            featureType: "states",
+            featureNS: "http://www.openplans.org/topp"
+        }),
+        renderers: renderer
+    })
+57.WMTS要素拾取
+	control = new OpenLayers.Control.WMTSGetFeatureInfo({
+	        drillDown: true,
+	        queryVisible: true,
+	        eventListeners: {
+	            getfeatureinfo: function(evt) {
 
 
 
@@ -1386,6 +1453,12 @@
                 }
             })
         }),
+6.wfs协议
+	protocol: new OpenLayers.Protocol.WFS({
+        url:  "http://demo.opengeo.org/geoserver/wfs",
+        featureType: "tasmania_roads",
+        featureNS: "http://www.openplans.org/topp"
+    })
 
 
 
@@ -1430,6 +1503,39 @@
           },
     //"in"/"out" 对应 "read"/"wirte"
 	var features = formats['in'][type].read(element.value);
+9.WMC格式
+	var format = new OpenLayers.Format.WMC({'layerOptions': {buffer: 0}});
+	map = format.read(text, {map: map});
+	var text = format.write(map);
+10.WMSDescribeLayer
+	format = new OpenLayers.Format.WMSDescribeLayer();
+11.WMTSCapabilities
+	format = new OpenLayers.Format.WMTSCapabilities({
+12.WPS
+    OpenLayers.Request.GET({
+    url: wps,
+    params: {
+        "SERVICE": "WPS",
+        "REQUEST": "DescribeProcess",
+        "VERSION": capabilities.version,
+        "IDENTIFIER": selection
+    },
+	OpenLayers.Request.POST({
+        url: wps,
+        data: new OpenLayers.Format.WPSExecute().write(process),
+        success: showOutput
+    });
+13.WPSClient
+	client = new OpenLayers.WPSClient({
+        servers: {
+            opengeo: 'http://demo.opengeo.org/geoserver/wps'
+        }
+    });
+	intersect = client.getProcess('opengeo', 'JTS:intersection');    
+14.XML
+	var format = new OpenLayers.Format.XML();
+	var nodes = format.getElementsByTagNameNS(node, uri, name);
+	var attributeNode = format.getAttributeNodeNS(node, uri, name);
 
 
 
@@ -1459,7 +1565,7 @@
 
 
 
-十四:边界
+十四:Bounds边界
 	var extent = new OpenLayers.Bounds(8, 44.5, 19, 50);
 
 
@@ -1496,6 +1602,31 @@
 	    lowerBoundary: startDate,
 	    upperBoundary: new Date(startDate.getTime() + (parseInt(spanEl.value, 10) * 1000))
 	});
+2.WFS过滤器
+	new OpenLayers.Layer.Vector("WFS", {
+            strategies: [new OpenLayers.Strategy.BBOX()],
+            protocol: new OpenLayers.Protocol.WFS({
+                url:  "http://demo.opengeo.org/geoserver/wfs",
+                featureType: "tasmania_roads",
+                featureNS: "http://www.openplans.org/topp"
+            }),
+            styleMap: ......,
+            filter: new OpenLayers.Filter.Logical({
+                type: OpenLayers.Filter.Logical.OR,
+                filters: [
+                    new OpenLayers.Filter.Comparison({
+                        type: OpenLayers.Filter.Comparison.EQUAL_TO,
+                        property: "TYPE",
+                        value: "highway"
+                    }),
+                    new OpenLayers.Filter.Comparison({
+                        type: OpenLayers.Filter.Comparison.EQUAL_TO,
+                        property: "TYPE",
+                        value: "road"
+                    })
+                ]
+            })
+        })
 
 
 
@@ -1547,6 +1678,10 @@
 	    }
 	});
     相当nb啊, 在支持canvas的浏览器里都可以显示表格效果, 回头研究下怎么弄的
- 3.Ajax跨域
+3.Ajax跨域
 	//这个回头得看看源码, 看看他纯前端怎么个思路
-	OpenLayers.ProxyHost = "/proxy/?url=";   
+	OpenLayers.ProxyHost = "/proxy/?url=";
+4.几种协议需要去了解一下异同
+	WMS WMC WFS WMTS WPS
+5.还有几个用得比较少的图层
+	WorldWind KaMap 	
