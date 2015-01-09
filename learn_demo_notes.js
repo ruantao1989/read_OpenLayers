@@ -98,6 +98,25 @@
 	var extent = new OpenLayers.Bounds(8, 44.5, 19, 50);
 	map.setOptions({restrictedExtent: extent});
 	//map.setOptions({restrictedExtent: null});
+18.左右俩图联动
+	map.events.register('moveend', map, function(){
+        map2.setCenter(map.getCenter(), map.getZoom());
+    });
+19.使用模版
+	//${getSize}相当于context.getSize(feature)
+	var context = {
+        getColor: function(feature) {
+            var region = parseInt((feature.geometry.x + 180) / 120);
+            return colors[region];
+        },
+        getSize: function(feature) {
+            return feature.attributes["type"] / map.getResolution() * .703125;
+        }
+    };
+    var template = {
+        pointRadius: "${getSize}", // using context.getSize(feature)
+        fillColor: "${getColor}" // using context.getColor(feature)
+    };
 
 
 
@@ -392,6 +411,27 @@
     //
     var radius = fraction * map.getExtent().getHeight();
     polygonControl.handler.setOptions({radius: radius,angle: 0});
+36.瓦片缓存图层
+	layer = new OpenLayers.Layer.TileCache("TileCache Layer",
+                ["http://c0.tilecache.osgeo.org/wms-c/cache/",
+                 "http://c1.tilecache.osgeo.org/wms-c/cache/",
+                 "http://c2.tilecache.osgeo.org/wms-c/cache/",
+                 "http://c3.tilecache.osgeo.org/wms-c/cache/",
+                 "http://c4.tilecache.osgeo.org/wms-c/cache/"],
+37.瓦片原点的偏移
+	tileOrigin: new OpenLayers.LonLat(-180, -90)
+38.TMS查询
+	layer = new OpenLayers.Layer.TMS( "TMS",
+        "http://tilecache.osgeo.org/wms-c/Basic.py/", {layername: 'basic', type:'png'} );
+39.图层zoom时的过渡效果
+	transitionEffect:'resize' ; //null
+40.UTFGrid
+	//读对应位置的json
+	var utfgrid = new OpenLayers.Layer.UTFGrid({
+	    url: "utfgrid/world_utfgrid/${z}/${x}/${y}.json",
+	    utfgridResolution: 4, // default is 2
+	    displayInLayerSwitcher: false
+	});
 
 
 
@@ -843,6 +883,62 @@
     ]);
 46.上下左右箭头
 	new OpenLayers.Control.PanPanel(),
+47.SLD选择器
+	 box: new OpenLayers.Control.SLDSelect(
+	        OpenLayers.Handler.RegularPolygon,
+	        {
+	            displayClass: 'olControlSLDSelectBox', 
+	            layers: [layers['waterbodies']],
+	            handlerOptions: {irregular: true}
+	        }
+	    ),
+48.截取点阵
+	var snap = new OpenLayers.Control.Snapping({
+	    layer: lines,
+	    targets: [{
+	        layer: points,//点阵图层Layer.PointGrid
+	        tolerance: 15
+	    }]
+	});
+49.删除全部要素
+	vectors.destroyFeatures();
+50.切分后,向量闪动
+	var split = new OpenLayers.Control.Split({
+        layer: vectors,
+        eventListeners: {
+            aftersplit: function(event) {
+                flashFeatures(event.features);//vectors.drawFeature(features[index], "select");  vectors.drawFeature(prev, "default");
+            }
+        }
+    });
+51.图形旋转
+    control = new OpenLayers.Control.TransformFeature(vectorLayer, {
+            renderIntent: "transform",
+            rotationHandleSymbolizer: "rotate"
+        });
+
+    control.setFeature(polygonFeature, {rotation: 45, scale: 0.5, ratio: 1.5});
+52.UTFGrid控件动作
+	move: new OpenLayers.Control.UTFGrid({
+		layers: [population],//某一个 ,全部用"null"
+        callback: callback,
+        handlerMode: "move"//"hover" "click"
+    }),
+53.UTFGrid控件根据坐标叠加图片
+	var callback = function(infoLookup, loc, pixel) {
+	    if (infoLookup) {
+	        for (var idx in infoLookup) {
+	           ...
+	            info = infoLookup[idx];
+	            if (info && info.data) {
+	                output.innerHTML = info.data.admin;
+	                flag.innerHTML = "<img src='data:image/png;base64," + info.data.flag_png + "'>";
+	                flag.style.left = (pixel.x + 15) + "px";
+	                flag.style.top = (pixel.y + 15) + "px";
+	            }
+	        }
+	    }
+	};
 
 
 
@@ -1012,6 +1108,48 @@
 	var origin = new OpenLayers.Geometry.Point(-111.04, 45.68);
     feature.geometry.rotate(360 / 20, origin);
     feature.layer.drawFeature(feature);
+7.选择要素
+	vectors.events.on({
+        'featureselected': function(feature) {
+            document.getElementById('counter').innerHTML = this.selectedFeatures.length;
+        },
+        'featureunselected': function(feature) {
+            document.getElementById('counter').innerHTML = this.selectedFeatures.length;
+        }
+    });
+    //控件
+    select: new OpenLayers.Control.SelectFeature(
+    	vectors,
+        {
+            clickout: false, toggle: false,
+            multiple: false, hover: false,
+            toggleKey: "ctrlKey", // ctrl key removes from selection
+            multipleKey: "shiftKey", // shift key adds to selection
+            box: true
+        }
+    ),
+    selecthover: new OpenLayers.Control.SelectFeature(
+        vectors,
+        {
+            multiple: false, hover: true,
+            toggleKey: "ctrlKey", // ctrl key removes from selection
+            multipleKey: "shiftKey" // shift key adds to selection
+        }
+    )
+8.选择要素,冒泡显示信息
+	selectControl = new OpenLayers.Control.SelectFeature(polygonLayer,
+        {onSelect: onFeatureSelect, onUnselect: onFeatureUnselect});
+	//气泡
+	function onFeatureSelect(feature) {
+            selectedFeature = feature;
+            popup = new OpenLayers.Popup.FramedCloud("chicken", 
+                                     feature.geometry.getBounds().getCenterLonLat(),
+                                     null,
+                                     "<div style='font-size:.8em'>Feature: " + feature.id +"<br>Area: " + feature.geometry.getArea()+"</div>",
+                                     null, true, onPopupClose);
+            feature.popup = popup;
+            map.addPopup(popup);
+        }
 
 
 
@@ -1066,6 +1204,12 @@
 4.mark点击弹窗
 	//对应关系在textfile.txt里
 	var newl = new OpenLayers.Layer.Text( "text", {location: "./textfile.txt"} );
+5.地图上等比例的方块
+	var bounds = new OpenLayers.Bounds(-45,-45, 0, 45); 
+    map.zoomToExtent(bounds);
+    var boxes = new OpenLayers.Layer.Boxes("boxes");
+    var box = new OpenLayers.Marker.Box(bounds);
+    boxes.addMarker(box);
 
 
 
@@ -1109,6 +1253,17 @@
             type: 5 + parseInt(5 * Math.random())
         }
     );
+5.fromWKT序列化和反序列化
+	var original = OpenLayers.Geometry.fromWKT("LINESTRING(" +
+	var newLineString = original.simplify(useVal);
+6.几何图形的旋转
+	new OpenLayers.Feature.Vector(
+	    new OpenLayers.Geometry.Point(x, y), {angle: (i*36)%360, opacity:i/10+.1}
+	)
+7.封闭多边形
+    var linearRing = new OpenLayers.Geometry.LinearRing(pointList);
+    var polygonFeature = new OpenLayers.Feature.Vector(
+        new OpenLayers.Geometry.Polygon([linearRing]));
 
 
 
@@ -1135,6 +1290,43 @@
 	            externalGraphic: "../img/marker-blue.png"
 	        }
 	    }),
+2.自定义图层样式
+	var myStyles = new OpenLayers.StyleMap({
+                "default": new OpenLayers.Style({
+                    pointRadius: "${type}", // sized according to type attribute
+                    fillColor: "#ffcc66",
+                    strokeColor: "#ff9933",
+                    strokeWidth: 2,
+                    graphicZIndex: 1
+                }),
+                "select": new OpenLayers.Style({
+                    fillColor: "#66ccff",
+                    strokeColor: "#3399ff",
+                    graphicZIndex: 2
+                })
+            });
+    //给向量图层定义 styleMap       
+	var points = new OpenLayers.Layer.Vector("Points", {
+                styleMap: myStyles,
+3.定义筛选规则
+	//0 <= blue < 25
+	var style = new OpenLayers.Style(
+		... ...
+        {
+            rules: [
+                new OpenLayers.Rule({
+                    // a rule contains an optional filter
+                    filter: new OpenLayers.Filter.Comparison({
+                        type: OpenLayers.Filter.Comparison.LESS_THAN,
+                        property: "foo", // the "foo" feature attribute
+                        value: 25
+                    }),
+                    // if a feature matches the above filter, use this symbolizer
+                    symbolizer: {
+                        externalGraphic: "../img/marker-blue.png"
+                    }
+                }),
+
 
 
 
@@ -1221,14 +1413,34 @@
 6.将KML转文本
      g =  new OpenLayers.Format.KML({extractStyles: true});
      features = g.read(req.responseText);
-	
+7.SLD的xml
+	var format = new OpenLayers.Format.SLD();	
+8.各种格式的反序列化
+	formats = {
+          'in': {
+            wkt: new OpenLayers.Format.WKT(in_options),
+            geojson: new OpenLayers.Format.GeoJSON(in_options),
+            georss: new OpenLayers.Format.GeoRSS(in_options),
+            gml2: new OpenLayers.Format.GML.v2(gmlOptionsIn),
+            gml3: new OpenLayers.Format.GML.v3(gmlOptionsIn),
+            kml: new OpenLayers.Format.KML(kmlOptionsIn),
+            atom: new OpenLayers.Format.Atom(in_options),
+            gpx: new OpenLayers.Format.GPX(in_options),
+            encoded_polyline: new OpenLayers.Format.EncodedPolyline(in_options)
+          },
+    //"in"/"out" 对应 "read"/"wirte"
+	var features = formats['in'][type].read(element.value);
+
+
 
 
 十二:Strategy策略
 1.加载形状时不请求底图
 	new OpenLayers.Layer.Vector("GML", {
 	strategies: [new OpenLayers.Strategy.Fixed()],//数据加载前图层是否可见. 
-
+2.聚集策略
+	//一堆点挤在一起, 可以设置间距
+	strategy = new OpenLayers.Strategy.Cluster();
 
 
 十三:LonLat坐标
@@ -1238,8 +1450,18 @@
 	    new OpenLayers.Projection("EPSG:4326"),
 	    map.getProjectionObject()
 	)
+2.Proj4JS坐标转换
+	geometry = new OpenLayers.Geometry.Point(x, y);
+	geometry.transform(
+        new OpenLayers.Projection('EPSG:4326'), 
+        new OpenLayers.Projection('EPSG:31467')
+    );
+
+
+
 十四:边界
 	var extent = new OpenLayers.Bounds(8, 44.5, 19, 50);
+
 
 
 十五:Util工具
@@ -1327,5 +1549,4 @@
     相当nb啊, 在支持canvas的浏览器里都可以显示表格效果, 回头研究下怎么弄的
  3.Ajax跨域
 	//这个回头得看看源码, 看看他纯前端怎么个思路
-	OpenLayers.ProxyHost = "/proxy/?url=";
-
+	OpenLayers.ProxyHost = "/proxy/?url=";   
